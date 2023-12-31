@@ -1,20 +1,20 @@
-# CCIP Gateway
+# IPNS.eth Backend Service
 
-CCIP-Read multi-threaded HTTP gateway
+Backend support for IPNS.eth
 
 ## Persistent node.js service with `systemctl`
 
 ### Service file
 
-- Put `istest.service.conf` in `/etc/systemd/system/`
+- Put `ipns-eth.service.conf` in `/etc/systemd/system/`
 
 ### Service Handling
 
-- Start: `systemctl start istest.service`
-- Stop: `systemctl stop istest.service`
+- Start: `systemctl start ipns-eth.service`
+- Stop: `systemctl stop ipns-eth.service`
 
 ### Verify
 
-- `journalctl -u istest.service`
+- `journalctl -u ipns-eth.service`
 
 FAQ: [Source](https://github.com/natancabral/run-nodejs-on-service-with-systemd-on-linux/)
