@@ -46,9 +46,9 @@ const CREATE_TABLE = `CREATE TABLE events (
 )`
 
 const options = {
-  key: fs.readFileSync('/etc/letsencrypt/live/ipns-eth.namesys.xyz/privkey.pem'),
-  cert: fs.readFileSync('/etc/letsencrypt/live/ipns-eth.namesys.xyz/cert.pem'),
-  ca: [fs.readFileSync('/etc/letsencrypt/live/ipns-eth.namesys.xyz/chain.pem')]
+  key: fs.readFileSync('/etc/letsencrypt/live/ipfs.namesys.xyz/privkey.pem'),
+  cert: fs.readFileSync('/etc/letsencrypt/live/ipfs.namesys.xyz/cert.pem'),
+  ca: [fs.readFileSync('/etc/letsencrypt/live/ipfs.namesys.xyz/chain.pem')]
 }
 
 const root = '/root/ipns-eth/'
