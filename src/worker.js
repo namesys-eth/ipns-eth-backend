@@ -67,8 +67,8 @@ async function handleCall(url, request, iterator) {
     let promises = [];
     let promise = new Promise((resolve, reject) => {
       connection.query(
-        `SELECT e.ipns, e.sequence as max_sequence, e.timestamp as max_timestamp,
-         e.ipfs, e.revision
+        `SELECT e.ipns, e.sequence as max_sequence, e.timestamp,
+         e.ipfs, e.revision, e.name
          FROM events e
          JOIN (
            SELECT ipns, MAX(sequence) as max_sequence
@@ -84,17 +84,19 @@ async function handleCall(url, request, iterator) {
           }
           const ipnsList = results.map((row) => row["ipns"]);
           const maxSequenceList = results.map((row) => row["max_sequence"]);
-          const maxTimestampList = results.map((row) => row["max_timestamp"]);
+          const timestampList = results.map((row) => row["timestamp"]);
           const ipfsList = results.map((row) => row["ipfs"]);
           const revisionList = results.map((row) => row["revision"]);
+          const nameList = results.map((row) => row["name"]);
           resolve({
             type: "data",
             data: {
               ipns: ipnsList,
-              maxSequence: maxSequenceList,
-              maxTimestamp: maxTimestampList,
+              sequence: maxSequenceList,
+              timestamp: timestampList,
               ipfs: ipfsList,
               revision: revisionList,
+              name: nameList,
             },
           });
         }
