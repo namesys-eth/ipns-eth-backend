@@ -67,10 +67,10 @@ async function handleCall(url, request, iterator) {
     let promises = [];
     let promise = new Promise((resolve, reject) => {
       connection.query(
-        `SELECT ipns, MAX(sequence) as max_sequence
-			 FROM events 
-			 WHERE timestamp > ${Launch} AND user = ${user} 
-			 GROUP BY ipns`,
+        `SELECT ipns, MAX(sequence) as max_sequence, MAX(timestamp) as max_timestamp
+         FROM events 
+         WHERE timestamp > ${Launch} AND user = ${user} 
+         GROUP BY ipns`,
         function (error, results, fields) {
           if (error) {
             console.error("Error reading events from database:", error);
@@ -78,11 +78,13 @@ async function handleCall(url, request, iterator) {
           }
           const ipnsList = results.map((row) => row["ipns"]);
           const maxSequenceList = results.map((row) => row["max_sequence"]);
+          const maxTimestampList = results.map((row) => row["max_timestamp"]);
           resolve({
             type: "data",
             data: {
               ipns: ipnsList,
-              maxSequence: maxSequenceList,
+              sequence: maxSequenceList,
+              timestamp: maxTimestampList,
             },
           });
         }

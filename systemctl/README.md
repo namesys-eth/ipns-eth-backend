@@ -2,15 +2,15 @@
 
 ### Service file
 
-- Put `istest.service.conf` in `/etc/systemd/system/`
+- Put `ipns.service` in `/etc/systemd/system/`
 
 ### Service Handling
 
-- Start: `systemctl start istest.service`
-- Stop: `systemctl stop istest.service`
+- Start: `systemctl start ipns.service`
+- Stop: `systemctl stop ipns.service`
 
 ### Verify
 
-- `journalctl -u istest.service`
+- `journalctl -u ipns.service`
 
 FAQ: [Source](https://github.com/natancabral/run-nodejs-on-service-with-systemd-on-linux/)
