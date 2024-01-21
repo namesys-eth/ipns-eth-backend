@@ -79,7 +79,7 @@ async function handleCall(url, request, iterator) {
           const ipnsList = results.map((row) => row["ipns"]);
           const maxSequenceList = results.map((row) => row["max_sequence"]);
           resolve({
-            type: "history",
+            type: "data",
             data: {
               ipns: ipnsList,
               maxSequence: maxSequenceList,
