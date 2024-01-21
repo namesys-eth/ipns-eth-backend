@@ -51,7 +51,7 @@ const options = {
   ca: [fs.readFileSync('/etc/letsencrypt/live/ipfs.namesys.xyz/chain.pem')]
 }
 
-const root = '/root/ipns-eth/'
+const root = '/root/ipns-eth-backend/'
 const abi = ethers.utils.defaultAbiCoder
 var count = 0
 const routes = ['/read', '/write', '/revision']
