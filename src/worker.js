@@ -67,36 +67,38 @@ async function handleCall(url, request, iterator) {
     let promises = [];
     let promise = new Promise((resolve, reject) => {
       connection.query(
-        `SELECT ipns, MAX(sequence) as max_sequence, MAX(timestamp) as max_timestamp,
-         ipfs, revision
-         FROM events 
-         WHERE timestamp > ${Launch} AND user = ${user} 
-         GROUP BY ipns`,
+        `SELECT e.ipns, e.sequence as max_sequence, e.timestamp as max_timestamp,
+         e.ipfs, e.revision
+         FROM events e
+         JOIN (
+           SELECT ipns, MAX(sequence) as max_sequence
+           FROM events
+           WHERE timestamp > ${Launch} AND user = ${user}
+           GROUP BY ipns
+         ) subquery
+         ON e.ipns = subquery.ipns AND e.sequence = subquery.max_sequence`,
         function (error, results, fields) {
           if (error) {
             console.error("Error reading events from database:", error);
             return;
           }
-
           const ipnsList = results.map((row) => row["ipns"]);
           const maxSequenceList = results.map((row) => row["max_sequence"]);
           const maxTimestampList = results.map((row) => row["max_timestamp"]);
           const ipfsList = results.map((row) => row["ipfs"]);
           const revisionList = results.map((row) => row["revision"]);
-
           resolve({
             type: "data",
             data: {
               ipns: ipnsList,
-              sequence: maxSequenceList,
-              timestamp: maxTimestampList,
+              maxSequence: maxSequenceList,
+              maxTimestamp: maxTimestampList,
               ipfs: ipfsList,
               revision: revisionList,
             },
           });
         }
       );
-
       console.log([iterator, ":", "Closing MySQL Connection"]);
       connection.end();
     });
