@@ -6,15 +6,15 @@ Backend support for IPNS.eth
 
 ### Service file
 
-- Put `ipns-eth.service.conf` in `/etc/systemd/system/`
+- Put `ipns.service` in `/etc/systemd/system/`
 
 ### Service Handling
 
-- Start: `systemctl start ipns-eth.service`
-- Stop: `systemctl stop ipns-eth.service`
+- Start: `systemctl start ipns.service`
+- Stop: `systemctl stop ipns.service`
 
 ### Verify
 
-- `journalctl -u ipns-eth.service`
+- `journalctl -u ipns.service`
 
 FAQ: [Source](https://github.com/natancabral/run-nodejs-on-service-with-systemd-on-linux/)
