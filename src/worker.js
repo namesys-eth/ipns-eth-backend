@@ -194,7 +194,7 @@ async function handleCall(url, request, iterator) {
         _results.forEach((_result) => {
           _sequence[_result.type] =
             _result.data && Number(_result.data) <= Number(sequence) // [!!!]
-              ? String(Number(sequence) - 1)
+              ? String(Number(sequence))
               : "0";
         });
       } else {
@@ -269,29 +269,62 @@ async function handleCall(url, request, iterator) {
     let response = {
       status: false,
     };
-    let ipns = request.ipns.split("ipns://")[1];
-    let ens = request.ens;
-    let hidden = request.hidden;
-    try {
-      await new Promise((resolve, reject) => {
-        connection.query(
-          ens
-            ? `UPDATE events SET ens = ? WHERE ipns = ?`
-            : `UPDATE events SET hidden = ? WHERE ipns = ?`,
-          ens ? [ens, ipns] : [hidden, ipns],
-          (error, results, fields) => {
-            if (error) {
-              console.error("Error executing meta update:", error);
-              reject(error);
-            } else {
-              response.status = true;
-              resolve();
+    let dataLength = request.ipns.length;
+    for (let i = 0; i < dataLength; i++) {
+      let ipns = request.ipns[i].split("ipns://")[1];
+      let ens = request.ens[i];
+      let hidden = request.hidden[i];
+      try {
+        await new Promise((resolve, reject) => {
+          connection.query(
+            ens
+              ? `UPDATE events SET ens = ? WHERE ipns = ?`
+              : `UPDATE events SET hidden = ? WHERE ipns = ?`,
+            ens ? [ens, ipns] : [hidden, ipns],
+            (error, results, fields) => {
+              if (error) {
+                console.error("Error executing meta update:", error);
+                reject(error);
+              } else {
+                response.status = true;
+                resolve();
+              }
             }
-          }
-        );
-      });
-    } catch (error) {
-      console.error("Error in meta update:", error);
+          );
+        });
+      } catch (error) {
+        console.error("Error in meta update:", error);
+      }
+    }
+    return JSON.stringify(response);
+  }
+  /// CLEAN
+  if (nature === "clean") {
+    let response = {
+      status: false,
+    };
+    let dataLength = request.ipns.length;
+    for (let i = 0; i < dataLength; i++) {
+      let ipns = request.ipns[i].split("ipns://")[1];
+      try {
+        await new Promise((resolve, reject) => {
+          connection.query(
+            `DELETE FROM events WHERE ipns = ? AND revision = '0x0'`,
+            [ipns],
+            (error, results, fields) => {
+              if (error) {
+                console.error("Error executing meta reset:", error);
+                reject(error);
+              } else {
+                response.status = true;
+                resolve();
+              }
+            }
+          );
+        });
+      } catch (error) {
+        console.error("Error in meta reset:", error);
+      }
     }
     return JSON.stringify(response);
   }

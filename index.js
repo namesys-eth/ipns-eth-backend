@@ -37,7 +37,7 @@ const options = {
 const root = "/root/ipns-eth-backend/";
 const abi = ethers.utils.defaultAbiCoder;
 var count = 0;
-const routes = ["/read", "/write", "/revision", "/meta"];
+const routes = ["/read", "/write", "/revision", "/meta", "/clean"];
 
 function errorHandler(err, req, res, next) {
   if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
@@ -57,7 +57,13 @@ app.get("/ping", async function (request, response) {
 });
 
 app.route(routes).post(async function (request, response) {
-  response.header("Access-Control-Allow-Origin", CORS[0], CORS[1], CORS[2], CORS[3]);
+  response.header(
+    "Access-Control-Allow-Origin",
+    CORS[0],
+    CORS[1],
+    CORS[2],
+    CORS[3]
+  );
   let paths = request.url.toLowerCase().split("/");
   let nature = paths[paths.length - 1];
   count = count + 1;
