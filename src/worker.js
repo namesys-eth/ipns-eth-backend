@@ -57,8 +57,6 @@ async function handleCall(url, request, iterator) {
   let paths = url.toLowerCase().split("/");
   let nature = paths[paths.length - 1];
   let user = request.user;
-  let timestamp = request.timestamp;
-
   /// READ
   if (nature === "read") {
     let response = {
@@ -68,12 +66,12 @@ async function handleCall(url, request, iterator) {
     let promise = new Promise((resolve, reject) => {
       connection.query(
         `SELECT e.ipns, e.sequence as max_sequence, e.timestamp,
-         e.ipfs, e.revision, e.name
+         e.ipfs, e.revision, e.name, e.ens, e.hidden
          FROM events e
          JOIN (
            SELECT ipns, MAX(sequence) as max_sequence
            FROM events
-           WHERE timestamp > ${Launch} AND user = ${user}
+           WHERE timestamp > ${Launch} AND user = '${user}' AND revision != '0x0'
            GROUP BY ipns
          ) subquery
          ON e.ipns = subquery.ipns AND e.sequence = subquery.max_sequence`,
@@ -88,6 +86,8 @@ async function handleCall(url, request, iterator) {
           const ipfsList = results.map((row) => row["ipfs"]);
           const revisionList = results.map((row) => row["revision"]);
           const nameList = results.map((row) => row["name"]);
+          const ensList = results.map((row) => row["ens"]);
+          const hiddenList = results.map((row) => row["hidden"]);
           resolve({
             type: "data",
             data: {
@@ -97,6 +97,8 @@ async function handleCall(url, request, iterator) {
               ipfs: ipfsList,
               revision: revisionList,
               name: nameList,
+              ens: ensList,
+              hidden: hiddenList,
             },
           });
         }
@@ -116,135 +118,181 @@ async function handleCall(url, request, iterator) {
     let response = {
       status: false,
     };
-    let ipns = request.ipns;
-    let ipfs = request.ipfs;
-    let writePath = `${fileStore}/${user}/${ipns}`;
-    let revisionFile = `${writePath}/revision.json`;
-
-    if (!fs.existsSync(writePath)) {
-      mkdirpSync(writePath); // Make repo if it doesn't exist
-    }
-
-    // Update DB
-    console.log([iterator, ":", "Updating Database..."]);
-    connection.query(
-      `INSERT INTO events (user, timestamp, ipfs, ipns, revision, sequence) VALUES (?, ?, ?, ?, ?, ?)`,
-      [user, timestamp, ipfs, ipns, "0x0", "0"],
-      (error, results, fields) => {
-        if (error) {
-          console.error("Error executing database update:", error);
-        } else {
-          response.status = true;
-        }
+    let dataLength = request.ipns.length;
+    for (let i = 0; i < dataLength; i++) {
+      let ipns = request.ipns[i].split("ipns://")[1];
+      let ipfs = request.ipfs[i].split("ipfs://")[1];
+      let timestamp = request.timestamp[i];
+      let name = request.name[i];
+      let ens = request.ens[i];
+      let hidden = request.hidden[i];
+      let writePath = `${fileStore}/${user}/${ipns}`;
+      if (!fs.existsSync(writePath)) {
+        mkdirpSync(writePath); // Make repo if it doesn't exist
       }
-    );
+      // Wrap the database query in a Promise
+      const queryPromise = new Promise((resolve, reject) => {
+        connection.query(
+          `INSERT INTO events (user, timestamp, ipfs, ipns, revision, sequence, name, ens, hidden) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [user, timestamp, ipfs, ipns, "0x0", 0, name, ens || "0", hidden],
+          (error, results, fields) => {
+            if (error) {
+              console.error("Error executing database update:", error);
+              reject(error);
+            } else {
+              response.status = true;
+              resolve();
+            }
+          }
+        );
+      });
+      await queryPromise;
+    }
     return JSON.stringify(response);
   }
   /// REVISION
   if (nature === "revision") {
-    let writePath = `${fileStore}/${user}`;
     let response = {
       status: false,
     };
-    let ipns = request.ipns;
-    let ipfs = request.ipfs;
-    let revision = request.revision;
-    let version = JSON.parse(request.version.replace("\\", ""));
-    let revisionFile = `${writePath}/revision.json`;
-    let _sequence = {};
+    let dataLength = request.ipns.length;
+    for (let i = 0; i < dataLength; i++) {
+      let ipns = request.ipns[i].split("ipns://")[1];
+      let ipfs = request.ipfs[i].split("ipfs://")[1];
+      let name = request.name[i];
+      let timestamp = request.timestamp[i];
+      let sequence = request.sequence[i];
+      let revision = request.revision[i];
+      let version = JSON.parse(request.version[i].replace("\\", ""));
+      let writePath = `${fileStore}/${user}/${ipns}`;
+      let revisionFile = `${writePath}/revision.json`;
+      let _sequence = {};
 
-    if (!fs.existsSync(writePath)) {
-      mkdirpSync(writePath); // Make repo if it doesn't exist
-    }
+      if (!fs.existsSync(writePath)) {
+        mkdirpSync(writePath); // Make repo if it doesn't exist
+      }
 
-    // Get history [can also read from database alternatively]
-    if (fs.existsSync(revisionFile)) {
+      // Get history [can also read from database alternatively]
+      if (fs.existsSync(revisionFile)) {
+        let promises = [];
+        let promise = new Promise((resolve, reject) => {
+          fs.readFile(revisionFile, function (err, data) {
+            if (err) {
+              reject(err);
+            } else {
+              let cache = JSON.parse(data);
+              resolve({
+                type: "sequence",
+                data: cache.sequence,
+              });
+              cache = {};
+            }
+          });
+        });
+        promises.push(promise);
+        let _results = await Promise.all(promises);
+        _results.forEach((_result) => {
+          _sequence[_result.type] =
+            _result.data && Number(_result.data) <= Number(sequence) // [!!!]
+              ? String(Number(sequence) - 1)
+              : "0";
+        });
+      } else {
+        _sequence["sequence"] = "0";
+      }
+      let _revision = new Uint8Array(Object.values(revision)).toString("utf-8");
+      // Update DB
+      console.log([iterator, ":", "Updating Database..."]);
+      connection.query(
+        `UPDATE events SET revision = ?, sequence = ? WHERE ipns = ? AND name = ? AND revision = '0x0' AND sequence = '0'`,
+        [_revision, _sequence.sequence, ipns, name],
+        (error, results, fields) => {
+          if (error) {
+            console.error("Error executing database update:", error);
+          }
+        }
+      );
+
+      // Write revision.json
       let promises = [];
       let promise = new Promise((resolve, reject) => {
-        fs.readFile(revisionFile, function (err, data) {
-          if (err) {
-            reject(err);
-          } else {
-            let cache = JSON.parse(data);
-            resolve({
-              type: "sequence",
-              data: cache.sequence,
-            });
-            cache = {};
+        fs.writeFile(
+          revisionFile,
+          JSON.stringify({
+            user: user,
+            data: revision,
+            timestamp: timestamp,
+            ipns: ipns,
+            ipfs: ipfs,
+            sequence: _sequence.sequence,
+            version: version,
+          }),
+          (err) => {
+            if (err) {
+              reject(err);
+            } else {
+              console.log([iterator, ":", "Making Revision File..."]);
+              response.status = true;
+              resolve();
+            }
           }
-        });
+        );
       });
       promises.push(promise);
-      let _results = await Promise.all(promises);
-      _results.forEach((_result) => {
-        _sequence[_result.type] = _result.data
-          ? String(Number(_result.data) + 1)
-          : "0";
+      await Promise.all(promises);
+
+      // Write version.json
+      // Encoded version metadata required by W3Name to republish IPNS records
+      promises = [];
+      promise = new Promise((resolve, reject) => {
+        fs.writeFile(
+          `${writePath}/version.json`,
+          JSON.stringify(version),
+          (err) => {
+            if (err) {
+              reject(err);
+            } else {
+              console.log([iterator, ":", "Making Version File..."]);
+              response.status = true;
+              resolve();
+            }
+          }
+        );
       });
-    } else {
-      _sequence["sequence"] = "0";
+      promises.push(promise);
+      await Promise.all(promises);
     }
-
-    // Update DB
-    console.log([iterator, ":", "Updating Database..."]);
-    connection.query(
-      `UPDATE events SET revision = ?, sequence = ? WHERE ipns = ? AND revision = '0x0' AND sequence = '0'`,
-      [revision, ipns, _sequence.sequence],
-      (error, results, fields) => {
-        if (error) {
-          console.error("Error executing database update:", error);
-        }
-      }
-    );
-
-    // Write revision.json
-    let promises = [];
-    let promise = new Promise((resolve, reject) => {
-      fs.writeFile(
-        revisionFile,
-        JSON.stringify({
-          user: user,
-          data: revision,
-          timestamp: timestamp,
-          ipns: ipns,
-          ipfs: ipfs,
-          sequence: _sequence.sequence,
-          version: version,
-        }),
-        (err) => {
-          if (err) {
-            reject(err);
-          } else {
-            console.log([iterator, ":", "Making Revision File..."]);
-            response.status = true;
-            resolve();
+    return JSON.stringify(response);
+  }
+  /// META
+  if (nature === "meta") {
+    let response = {
+      status: false,
+    };
+    let ipns = request.ipns.split("ipns://")[1];
+    let ens = request.ens;
+    let hidden = request.hidden;
+    try {
+      await new Promise((resolve, reject) => {
+        connection.query(
+          ens
+            ? `UPDATE events SET ens = ? WHERE ipns = ?`
+            : `UPDATE events SET hidden = ? WHERE ipns = ?`,
+          ens ? [ens, ipns] : [hidden, ipns],
+          (error, results, fields) => {
+            if (error) {
+              console.error("Error executing meta update:", error);
+              reject(error);
+            } else {
+              response.status = true;
+              resolve();
+            }
           }
-        }
-      );
-    });
-    promises.push(promise);
-    await Promise.all(promises);
-
-    // Write version.json
-    // Encoded version metadata required by W3Name to republish IPNS records
-    promises = [];
-    promise = new Promise((resolve, reject) => {
-      fs.writeFile(
-        `${writePath}/version.json`,
-        JSON.stringify(version),
-        (err) => {
-          if (err) {
-            reject(err);
-          } else {
-            console.log([iterator, ":", "Making Version File..."]);
-            response.status = true;
-            resolve();
-          }
-        }
-      );
-    });
-    promises.push(promise);
-    await Promise.all(promises);
+        );
+      });
+    } catch (error) {
+      console.error("Error in meta update:", error);
+    }
     return JSON.stringify(response);
   }
 }
